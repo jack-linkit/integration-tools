@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "integration-tools"
+version = "0.1.0"
+description = "Integration setup and request management utilities"
+readme = "README.md"
+authors = [
+    {name = "LinkIt Team", email = "dev@linkit.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "sqlalchemy>=2.0.0",
+    "pyodbc>=4.0.0",
+    "paramiko>=3.0.0",
+    "keyring>=24.0.0",
+    "zstandard>=0.22.0",
+    "tabulate>=0.9.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "asyncio-pool>=0.6.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+]
+
+[project.scripts]
+integration-tools = "integration_tools.cli.main:main"
+request-replayer = "integration_tools.cli.enhanced_request_replayer:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["integration_tools*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.8"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "--cov=integration_tools --cov-report=html --cov-report=term-missing"
+asyncio_mode = "auto"
