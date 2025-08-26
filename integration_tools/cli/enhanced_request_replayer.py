@@ -22,16 +22,30 @@ console = Console()
 error_handler = ErrorHandler()
 
 
+def get_request_manager(ctx):
+    """Get or create the request manager with proper initialization."""
+    if ctx.obj['request_manager'] is None:
+        try:
+            rprint("[bold blue]Initializing request manager...[/bold blue]")
+            ctx.obj['request_manager'] = AsyncRequestManager()
+            ctx.obj['workflows'] = CommonWorkflows(ctx.obj['request_manager'])
+            rprint("[bold green]✓ Request manager initialized successfully[/bold green]")
+        except Exception as e:
+            rprint(f"[bold red]✗ Failed to initialize request manager: {e}[/bold red]")
+            raise
+    return ctx.obj['request_manager']
+
+
 @click.group()
 @click.option('--log-level', default='INFO', help='Logging level')
 @click.option('--log-file', help='Optional log file path')
 @click.pass_context
 def cli(ctx, log_level, log_file):
     """Enhanced Request Replayer with batch operations and workflows."""
-    ctx.ensure_object(dict)
-    ctx.obj['logger'] = setup_logging(log_level, log_file)
-    ctx.obj['request_manager'] = AsyncRequestManager()
-    ctx.obj['workflows'] = CommonWorkflows(ctx.obj['request_manager'])
+    # Context object is now initialized in main.py
+    # Just set up logging if not already done
+    if ctx.obj.get('logger') is None:
+        ctx.obj['logger'] = setup_logging(log_level, log_file)
 
 
 @cli.command()
@@ -40,7 +54,11 @@ def cli(ctx, log_level, log_file):
 def list_types(ctx, name_filter):
     """List DataRequestTypes with optional filtering."""
     try:
-        rm = ctx.obj['request_manager']
+        rm = get_request_manager(ctx)
+        
+        # Get credentials to ensure they're available
+        rm.get_db_credentials()
+        
         types = rm.list_request_types(name_filter)
         
         table = Table(show_header=True, header_style="bold magenta")
@@ -66,12 +84,16 @@ def list_types(ctx, name_filter):
 def find_requests(ctx, type_ids, type_names, district_ids, json_output, save_csv):
     """Find latest requests by various criteria."""
     try:
-        rm = ctx.obj['request_manager']
+        rm = get_request_manager(ctx)
         
         # Parse input parameters
         type_id_list = [int(x.strip()) for x in type_ids.split(',')] if type_ids else None
         type_name_list = [x.strip() for x in type_names.split(',')] if type_names else None
         district_id_list = [int(x.strip()) for x in district_ids.split(',')] if district_ids else None
+        
+        # Get credentials BEFORE starting the status display to avoid blocking prompts
+        # This ensures any credential prompts happen before the Rich status interferes
+        rm.get_db_credentials()
         
         with console.status("[bold green]Searching for requests..."):
             requests = rm.find_requests(type_id_list, type_name_list, district_id_list)
@@ -140,7 +162,10 @@ def find_requests(ctx, type_ids, type_names, district_ids, json_output, save_csv
 def show_email(ctx, request_id):
     """Show email content for a request in browser."""
     try:
-        rm = ctx.obj['request_manager']
+        rm = get_request_manager(ctx)
+        
+        # Get credentials BEFORE starting the status display to avoid blocking prompts
+        rm.get_db_credentials()
         
         with console.status(f"[bold green]Fetching email content for RequestID {request_id}..."):
             success = rm.show_email_content(request_id)
@@ -162,7 +187,7 @@ def show_email(ctx, request_id):
 def download(ctx, request_ids, local_dir, max_concurrent):
     """Download files for requests (comma-separated IDs)."""
     try:
-        rm = ctx.obj['request_manager']
+        rm = get_request_manager(ctx)
         request_id_list = [int(x.strip()) for x in request_ids.split(',')]
         
         rprint(f"[bold]Starting download of {len(request_id_list)} requests...[/bold]")
@@ -203,7 +228,7 @@ def download(ctx, request_ids, local_dir, max_concurrent):
 def restore(ctx, request_ids, temp_dir, max_concurrent):
     """Restore processed files for requests back to SFTP."""
     try:
-        rm = ctx.obj['request_manager']
+        rm = get_request_manager(ctx)
         request_id_list = [int(x.strip()) for x in request_ids.split(',')]
         
         rprint(f"[bold]Starting restore of {len(request_id_list)} requests...[/bold]")
@@ -244,9 +269,12 @@ def restore(ctx, request_ids, temp_dir, max_concurrent):
 def rerun(ctx, request_ids, delete_checksums, checksum_keys):
     """Re-trigger runs for requests with optional checksum deletion."""
     try:
-        rm = ctx.obj['request_manager']
+        rm = get_request_manager(ctx)
         request_id_list = [int(x.strip()) for x in request_ids.split(',')]
         checksum_key_list = [x.strip() for x in checksum_keys.split(',')] if checksum_keys else None
+        
+        # Get credentials BEFORE starting the status display to avoid blocking prompts
+        rm.get_db_credentials()
         
         with console.status(f"[bold green]Processing rerun for {len(request_id_list)} requests..."):
             result = rm.rerun_requests(request_id_list, delete_checksums, checksum_key_list)
@@ -277,6 +305,8 @@ def workflow():
 def district_refresh(ctx, district_ids, type_names, delete_checksums, restore_files):
     """Complete district refresh workflow."""
     try:
+        # Get request manager to ensure workflows are initialized
+        get_request_manager(ctx)
         workflows = ctx.obj['workflows']
         district_id_list = [int(x.strip()) for x in district_ids.split(',')]
         type_name_list = [x.strip() for x in type_names.split(',')]
@@ -327,6 +357,8 @@ def district_refresh(ctx, district_ids, type_names, delete_checksums, restore_fi
 def bulk_download(ctx, type_names, district_ids, local_dir, max_concurrent):
     """Bulk download files for request types."""
     try:
+        # Get request manager to ensure workflows are initialized
+        get_request_manager(ctx)
         workflows = ctx.obj['workflows']
         type_name_list = [x.strip() for x in type_names.split(',')]
         district_id_list = [int(x.strip()) for x in district_ids.split(',')] if district_ids else None
@@ -367,6 +399,8 @@ def bulk_download(ctx, type_names, district_ids, local_dir, max_concurrent):
 def monitor(ctx, integration_types, days_back, json_output):
     """Monitor integration health and performance."""
     try:
+        # Get request manager to ensure workflows are initialized
+        get_request_manager(ctx)
         workflows = ctx.obj['workflows']
         integration_type_list = [x.strip() for x in integration_types.split(',')]
         

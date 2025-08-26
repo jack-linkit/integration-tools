@@ -107,14 +107,15 @@ class TestFileManager:
     
     def test_download_requestid_raw_files_success(self, file_manager, mock_sftp_client, temp_dir):
         """Test successful download of raw files."""
+        # Mock the first listdir call (listing the main directory)
         mock_sftp_client.listdir.return_value = ["123_test_folder", "other_folder"]
         mock_sftp_client.stat.return_value = MagicMock(st_mode=0o40000)  # Directory
         
-        # Mock files in the request directory
+        # Mock the second listdir call (listing files in the request directory)
         def listdir_side_effect(path):
             if "123_test_folder" in path:
                 return ["file1.csv", "file2.txt", "file3.log"]
-            return []
+            return ["123_test_folder", "other_folder"]  # Default for first call
         
         mock_sftp_client.listdir.side_effect = listdir_side_effect
         
@@ -164,7 +165,7 @@ class TestFileManager:
                                                   file_manager, mock_sftp_client, temp_dir):
         """Test successful download and extraction of backup file."""
         # Mock zstandard
-        with patch('src.integration_tools.core.file_manager.zstd') as mock_zstd:
+        with patch('integration_tools.core.file_manager.zstd') as mock_zstd:
             mock_decompressor = MagicMock()
             mock_zstd.ZstdDecompressor.return_value = mock_decompressor
             
@@ -189,7 +190,7 @@ class TestFileManager:
     
     def test_download_requestid_backup_file_no_zstd(self, file_manager, mock_sftp_client, temp_dir):
         """Test backup file download when zstandard is not available."""
-        with patch('src.integration_tools.core.file_manager.zstd', None):
+        with patch('integration_tools.core.file_manager.zstd', None):
             success, count, message = file_manager.download_requestid_backup_file(
                 mock_sftp_client, 123, temp_dir
             )

@@ -29,25 +29,26 @@ class TestCommonWorkflows:
         """Test successful district refresh workflow."""
         mock_manager = AsyncMock()
         
-        # Mock request finding
+        # Mock request finding (this is a sync method, not async)
         sample_requests = [
             RequestRow(123, 456, 66, "SAT", "test_path", 5, datetime.now()),
             RequestRow(124, 456, 67, "PSAT", "test_path2", 5, datetime.now())
         ]
-        mock_manager.find_requests.return_value = sample_requests
+        # Use sync_spec to properly mock the sync method
+        mock_manager.find_requests = MagicMock(return_value=sample_requests)
         
-        # Mock restore files
+        # Mock restore files (this is async)
         mock_manager.restore_files_batch.return_value = {
             123: {"success": True, "files_moved": 2},
             124: {"success": True, "files_moved": 1}
         }
         
-        # Mock rerun
-        mock_manager.rerun_requests.return_value = {
+        # Mock rerun (this is sync)
+        mock_manager.rerun_requests = MagicMock(return_value={
             "request_ids": [123, 124],
             "checksums_deleted": 5,
             "queues_updated": 2
-        }
+        })
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -70,7 +71,8 @@ class TestCommonWorkflows:
     async def test_district_refresh_workflow_no_requests(self):
         """Test district refresh workflow when no requests are found."""
         mock_manager = AsyncMock()
-        mock_manager.find_requests.return_value = []
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=[])
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -92,12 +94,13 @@ class TestCommonWorkflows:
         sample_requests = [
             RequestRow(123, 456, 66, "SAT", "test_path", 5, datetime.now())
         ]
-        mock_manager.find_requests.return_value = sample_requests
-        mock_manager.rerun_requests.return_value = {
+        # Mock the sync methods properly
+        mock_manager.find_requests = MagicMock(return_value=sample_requests)
+        mock_manager.rerun_requests = MagicMock(return_value={
             "request_ids": [123],
             "checksums_deleted": 2,
             "queues_updated": 1
-        }
+        })
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -116,7 +119,8 @@ class TestCommonWorkflows:
     async def test_district_refresh_workflow_exception(self):
         """Test district refresh workflow with exception."""
         mock_manager = AsyncMock()
-        mock_manager.find_requests.side_effect = Exception("Database error")
+        # Mock the sync method to raise an exception
+        mock_manager.find_requests = MagicMock(side_effect=Exception("Database error"))
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -139,7 +143,8 @@ class TestCommonWorkflows:
             RequestRow(123, 456, 66, "SAT", "test_path", 5, datetime.now()),
             RequestRow(124, 457, 67, "PSAT", "test_path2", 5, datetime.now())
         ]
-        mock_manager.find_requests.return_value = sample_requests
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=sample_requests)
         
         # Mock download results
         mock_manager.download_files_batch.return_value = {
@@ -166,7 +171,8 @@ class TestCommonWorkflows:
     async def test_bulk_file_download_workflow_no_requests(self):
         """Test bulk file download workflow with no matching requests."""
         mock_manager = AsyncMock()
-        mock_manager.find_requests.return_value = []
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=[])
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -189,7 +195,8 @@ class TestCommonWorkflows:
             RequestRow(123, 456, 66, "SAT", "test_path", 5, datetime.now()),
             RequestRow(124, 457, 67, "SAT", "test_path2", 5, datetime.now())
         ]
-        mock_manager.find_requests.return_value = sample_requests
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=sample_requests)
         
         # Mock partial download success
         mock_manager.download_files_batch.return_value = {
@@ -221,7 +228,8 @@ class TestCommonWorkflows:
             RequestRow(125, 457, 66, "SAT", "test_path3", 4, datetime.now()),  # Failed
             RequestRow(126, 457, 67, "PSAT", "test_path4", 5, datetime.now()),  # Success
         ]
-        mock_manager.find_requests.return_value = sample_requests
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=sample_requests)
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -250,7 +258,8 @@ class TestCommonWorkflows:
     async def test_integration_monitoring_workflow_no_requests(self):
         """Test integration monitoring workflow with no requests."""
         mock_manager = AsyncMock()
-        mock_manager.find_requests.return_value = []
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=[])
         
         workflows = CommonWorkflows(mock_manager)
         
@@ -271,7 +280,8 @@ class TestCommonWorkflows:
             RequestRow(123, 456, 66, "SAT", "test_path", 5, datetime.now()),
             RequestRow(124, 457, 67, "PSAT", "test_path2", 5, datetime.now()),
         ]
-        mock_manager.find_requests.return_value = sample_requests
+        # Mock the sync method properly
+        mock_manager.find_requests = MagicMock(return_value=sample_requests)
         
         workflows = CommonWorkflows(mock_manager)
         
