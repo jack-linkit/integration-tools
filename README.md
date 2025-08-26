@@ -1,6 +1,6 @@
 # Integration Tools
 
-A comprehensive suite of utilities for automating integration setup processes and managing data processing requests.
+A comprehensive suite of utilities for managing data processing requests and integration workflows.
 
 ## Features
 
@@ -12,12 +12,10 @@ A comprehensive suite of utilities for automating integration setup processes an
 - **Download files** to local directories for analysis
 - **Email content viewer** for request notifications
 
-### Integration Setup
-- **Automated setup** for new integrations (SAT, PSAT, etc.)
-- **Database record creation** (xpsDistrictUpload, DistrictDataParm)
-- **SFTP directory management** with automatic creation
-- **Configuration management** with JSON templates
-- **School mapping error resolution** utilities
+### Database Models and Utilities
+- **SQLAlchemy models** for School, Request, DataRequestType, and related entities
+- **School mapping utilities** for resolving integration errors
+- **Database session management** and query utilities
 
 ## Installation
 
@@ -43,16 +41,6 @@ request-replayer restore --request-ids 456,789
 request-replayer rerun-by-requests --request-ids 456 --delete-checksums
 ```
 
-### Integration Setup
-```bash
-# Interactive mode
-integration-tools
-
-# Command line mode  
-integration-tools SAT  # Setup SAT integration
-integration-tools PSAT # Setup PSAT integration
-```
-
 ## Project Structure
 
 ```
@@ -63,9 +51,10 @@ integration-tools/
 │   │   ├── file_manager.py       # SFTP/file operations
 │   │   ├── db_manager.py         # Database operations
 │   │   └── credential_manager.py # Unified credential handling
-│   ├── integrations/      # Integration setup utilities
 │   ├── cli/              # Command line interfaces
-│   └── workflows/        # Pre-defined workflows
+│   ├── workflows/        # Pre-defined workflows
+│   ├── models.py         # Database models
+│   └── school_mapping.py # School mapping utilities
 ├── tests/                # Test suite
 ├── docs/                 # Documentation
 └── examples/            # Usage examples
