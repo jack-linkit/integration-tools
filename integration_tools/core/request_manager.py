@@ -3,8 +3,11 @@ Request Manager - Main orchestration class for request lifecycle management.
 """
 
 import asyncio
+import glob
 import json
+import os
 import tempfile
+import time
 import webbrowser
 from typing import Dict, List, Optional, Sequence
 
@@ -22,6 +25,59 @@ class RequestManager:
         self.file_manager = FileManager()
         self._cached_db_credentials: Optional[tuple] = None
         self._cached_sftp_credentials: Optional[tuple] = None
+    
+    @staticmethod
+    def _cleanup_expired_email_files(max_age_hours: int = 24) -> None:
+        """
+        Clean up temporary HTML email files that are older than the specified age.
+        
+        Args:
+            max_age_hours: Maximum age in hours before files are considered expired (default: 24)
+        """
+        temp_dir = tempfile.gettempdir()
+        pattern = os.path.join(temp_dir, "*_req_*.html")
+        current_time = time.time()
+        max_age_seconds = max_age_hours * 3600
+        files_removed = 0
+        
+        for file_path in glob.glob(pattern):
+            try:
+                # Only process files that match our pattern
+                if "_req_" in os.path.basename(file_path) and file_path.endswith(".html"):
+                    # Check file age
+                    file_age = current_time - os.path.getmtime(file_path)
+                    if file_age > max_age_seconds:
+                        os.remove(file_path)
+                        files_removed += 1
+            except Exception:
+                pass  # Silently ignore cleanup failures
+        
+        if files_removed > 0:
+            print(f"Cleaned up {files_removed} expired temporary HTML file(s) older than {max_age_hours} hours")
+    
+    @staticmethod
+    def cleanup_all_temp_email_files() -> None:
+        """
+        Manually clean up ALL temporary HTML email files, regardless of age.
+        Useful for immediate cleanup when needed.
+        """
+        temp_dir = tempfile.gettempdir()
+        pattern = os.path.join(temp_dir, "*_req_*.html")
+        files_removed = 0
+        
+        for file_path in glob.glob(pattern):
+            try:
+                # Only process files that match our pattern
+                if "_req_" in os.path.basename(file_path) and file_path.endswith(".html"):
+                    os.remove(file_path)
+                    files_removed += 1
+            except Exception:
+                pass  # Silently ignore cleanup failures
+        
+        if files_removed > 0:
+            print(f"Cleaned up {files_removed} temporary HTML email file(s)")
+        else:
+            print("No temporary HTML email files found to clean up")
     
     def get_db_credentials(self, force_prompt: bool = False) -> tuple:
         """Get database credentials with caching."""
@@ -80,12 +136,13 @@ class RequestManager:
                 session, type_ids, type_names, district_ids, statuses
             )
     
-    def show_email_content(self, request_id: int) -> bool:
+    def show_email_content(self, request_id: int, cleanup_expired: bool = True) -> bool:
         """
         Show email content for a request in browser.
         
         Args:
             request_id: Request ID to show email for
+            cleanup_expired: Whether to clean up expired temp files (default: True)
             
         Returns:
             True if email was found and opened
@@ -100,6 +157,10 @@ class RequestManager:
             email, attach = content
             if email:
                 try:
+                    # Optionally clean up expired temporary HTML files (older than 24 hours)
+                    if cleanup_expired:
+                        self._cleanup_expired_email_files()
+                    
                     html_doc = (
                         "<!doctype html><html><head><meta charset='utf-8'><title>EmailContent"
                         f" {request_id}</title></head><body>" + email + "</body></html>"
@@ -110,6 +171,7 @@ class RequestManager:
                     
                     webbrowser.open(f"file://{temp_path}")
                     print(f"Opened HTML in browser: {temp_path}")
+                    print(f"Note: Temporary file will be automatically cleaned up after 24 hours")
                     return True
                 except Exception as e:
                     print(f"Failed to open HTML in browser: {e}")
