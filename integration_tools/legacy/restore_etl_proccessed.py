@@ -11,24 +11,37 @@ def process_requestid_raw_files(sftp_client, request_id, target_dir, local_tmp_d
     For a given request_id, find the directory starting with request_id in /ETLProcessedFolder/001, 
     download all CSV files from that directory, and move them to target_dir.
     """
-    remote_dir = "LinkIt/ETLProcessedFolder/001"
+    # Try main ETLProcessedFolder first, then fallback to BackupData
+    remote_dirs = [
+        "LinkIt/ETLProcessedFolder/001",
+        "LinkIt/BackupData/ETLProcessedFolder/001"
+    ]
     
-    try:
-        files = sftp_client.listdir(remote_dir)
-    except Exception as e:
-        return False, 0, f"Error listing {remote_dir}: {str(e)}"
-
-    # Find the directory that starts with request_id
     match_dir = None
-    for f in files:
-        if f.startswith(str(request_id)) and sftp_client.stat(f"{remote_dir}/{f}").st_mode & 0o40000:  # Check if it's a directory
-            match_dir = f
-            break
+    remote_dir = None
+    
+    for dir_path in remote_dirs:
+        try:
+            files = sftp_client.listdir(dir_path)
+            for f in files:
+                if f.startswith(str(request_id)):
+                    try:
+                        # Check if it's a directory
+                        if sftp_client.stat(f"{dir_path}/{f}").st_mode & 0o40000:
+                            match_dir = f
+                            remote_dir = dir_path
+                            break
+                    except Exception:
+                        continue
+            if match_dir:
+                break
+        except Exception as e:
+            continue  # Try next directory
     
     if not match_dir:
-        return False, 0, f"No directory found starting with {request_id} in {remote_dir} (searched both ETLProcessedFolder and BackupData locations)"
+        return False, 0, f"No directory found starting with {request_id} in ETLProcessedFolder or BackupData locations"
     else:
-        print(f"Found directory: {match_dir}")
+        print(f"Found directory: {match_dir} in {remote_dir}")
 
     remote_folder_path = f"{remote_dir}/{match_dir}"
     
@@ -102,24 +115,35 @@ def process_requestid_raw_files(sftp_client, request_id, target_dir, local_tmp_d
 
 def process_requestid_file(sftp_client, request_id, target_dir, local_tmp_dir="tmp"):  # new function
     """
-    For a given request_id, find the .tar.zst file in /BackupData/ETLProcessedFolder/001, download, decompress, extract CSV, and move to target_dir.
+    For a given request_id, find the .tar.zst file in /BackupData/ETLProcessedFolder/001 or /ETLProcessedFolder/001, 
+    download, decompress, extract CSV, and move to target_dir.
     """
-    remote_dir = "LinkIt/BackupData/ETLProcessedFolder/001"
-    # remote_dir = "LinkIt/ETLProcessedFolder/001"
-    try:
-        files = sftp_client.listdir(remote_dir)
-    except Exception as e:
-        return False, 0, f"Error listing {remote_dir}: {str(e)}"
-
-    # Find the file
+    # Try BackupData first, then fallback to main ETLProcessedFolder
+    remote_dirs = [
+        "LinkIt/BackupData/ETLProcessedFolder/001",
+        "LinkIt/ETLProcessedFolder/001"
+    ]
+    
     match = None
-    for f in files:
-        if f.startswith(str(request_id)) and f.endswith(".tar.zst"):
-            match = f
-            break
+    remote_dir = None
+    
+    for dir_path in remote_dirs:
+        try:
+            files = sftp_client.listdir(dir_path)
+            for f in files:
+                if f.startswith(str(request_id)) and f.endswith(".tar.zst"):
+                    match = f
+                    remote_dir = dir_path
+                    break
+            if match:
+                break
+        except Exception as e:
+            continue  # Try next directory
+    
     if not match:
-        return False, 0, f"No .tar.zst file found for {request_id} in {remote_dir} (searched both ETLProcessedFolder and BackupData locations)"
-    else: print(match)
+        return False, 0, f"No .tar.zst file found for {request_id} in BackupData or ETLProcessedFolder locations"
+    else: 
+        print(f"Found {match} in {remote_dir}")
 
     remote_path = f"{remote_dir}/{match}"
 
@@ -152,19 +176,19 @@ def process_requestid_file(sftp_client, request_id, target_dir, local_tmp_dir="t
     except Exception as e:
         return False, 0, f"Failed to decompress {local_zst}: {str(e)}"
 
-    # Extract .csv from .tar
-    csv_files = []
+    # Extract all files from .tar (not just CSV)
+    extracted_files = []
     try:
         with tarfile.open(local_tar, "r") as tar:
             for member in tar.getmembers():
-                if member.name.endswith(".csv"):
+                if member.isfile():  # Only extract regular files
                     tar.extract(member, path=work_dir)
-                    csv_files.append(os.path.join(work_dir, member.name))
+                    extracted_files.append(os.path.join(work_dir, member.name))
     except Exception as e:
         return False, 0, f"Failed to extract .tar: {str(e)}"
 
-    if not csv_files:
-        return False, 0, f"No .csv files found in {local_tar}"
+    if not extracted_files:
+        return False, 0, f"No files found in {local_tar}"
 
     # Ensure target_dir exists
     try:
@@ -175,21 +199,21 @@ def process_requestid_file(sftp_client, request_id, target_dir, local_tmp_dir="t
         except Exception as e:
             return False, 0, f"Failed to create target directory {target_dir}: {str(e)}"
 
-    # Move CSVs to target_dir (upload)
+    # Move files to target_dir (upload)
     files_moved = 0
     errors = []
-    for csv_path in csv_files:
-        filename = os.path.basename(csv_path)
+    for file_path in extracted_files:
+        filename = os.path.basename(file_path)
         remote_dest = f"{target_dir}/{filename}"
         try:
-            sftp_client.put(csv_path, remote_dest)
+            sftp_client.put(file_path, remote_dest)
             files_moved += 1
             print(f"✓ Uploaded {filename} for RequestID {request_id}")
         except Exception as e:
             errors.append(f"Failed to upload {filename}: {str(e)}")
 
     # Cleanup local files
-    for f in [local_zst, local_tar] + csv_files:
+    for f in [local_zst, local_tar] + extracted_files:
         try:
             os.remove(f)
         except Exception:
@@ -197,8 +221,8 @@ def process_requestid_file(sftp_client, request_id, target_dir, local_tmp_dir="t
 
     # Attempt to remove any empty directories created by extraction (but don't touch base tmp unless we created it)
     extracted_dirs = []
-    for csv_path in csv_files:
-        dir_path = os.path.dirname(csv_path)
+    for file_path in extracted_files:
+        dir_path = os.path.dirname(file_path)
         if dir_path and dir_path != local_tmp_dir and dir_path not in extracted_dirs:
             extracted_dirs.append(dir_path)
     for d in sorted(extracted_dirs, key=lambda p: len(p.split(os.sep)), reverse=True):
@@ -219,7 +243,7 @@ def process_requestid_file(sftp_client, request_id, target_dir, local_tmp_dir="t
 
     if errors:
         return False, files_moved, f"Completed with errors: {'; '.join(errors)}"
-    return True, files_moved, f"Successfully processed {files_moved} CSV files"
+    return True, files_moved, f"Successfully processed {files_moved} files"
 
 
 def process_requestids(requestid_to_target, hostname, username, password=None, key_path=None, local_tmp_dir="/tmp"):
@@ -252,6 +276,56 @@ def process_requestids(requestid_to_target, hostname, username, password=None, k
             sftp.close()
         if transport:
             transport.close()
+    return results
+
+def restore_for_requestids(sftp_client, requestid_to_target, temp_dir="/tmp", progress_callback=None, mute_output=False):
+    """
+    Restore processed files for multiple RequestIDs using an existing SFTP connection.
+    
+    Args:
+        sftp_client: Existing SFTP client connection
+        requestid_to_target: Dictionary mapping request_id to target directory
+        temp_dir: Temporary directory for processing
+        progress_callback: Optional callback function for progress updates
+        mute_output: Whether to suppress output
+        
+    Returns:
+        Dictionary mapping request_id to restore results
+    """
+    results = {}
+    total_requests = len(requestid_to_target)
+    
+    for i, (request_id, target_dir) in enumerate(requestid_to_target.items()):
+        if not mute_output:
+            print(f"\nProcessing RequestID: {request_id}")
+            print(f"Target directory: {target_dir}")
+        
+        # Try the compressed file approach first
+        success, files_moved, message = process_requestid_file(
+            sftp_client, request_id, target_dir, temp_dir
+        )
+        
+        # If that fails, try the raw files approach
+        if not success and "No .tar.zst file found" in message:
+            if not mute_output:
+                print(f"Trying raw files approach for RequestID: {request_id}")
+            success, files_moved, message = process_requestid_raw_files(
+                sftp_client, request_id, target_dir, temp_dir
+            )
+        
+        results[request_id] = {
+            "success": success,
+            "files_moved": files_moved,
+            "message": message,
+        }
+        
+        if not mute_output:
+            print(f"Result: {message}")
+        
+        # Call progress callback if provided
+        if progress_callback:
+            progress_callback(i + 1, total_requests, request_id, success, files_moved, message)
+    
     return results
 
 # Example usage:

@@ -78,7 +78,8 @@ class FileManager:
         Handles variations like:
         - F:\\FTProot\\Districts\\... -> /Districts/...
         - F:/FTProot/Districts/... -> /Districts/...
-        - Mixed or unexpected case; falls back to the segment starting at 'Districts'.
+        - F:\\FTProot\\schooltool\\... -> /schooltool/...
+        - Any path with FTProot prefix gets the prefix removed
         
         Args:
             db_path: Windows-style database path
@@ -97,16 +98,12 @@ class FileManager:
         # Trim leading slashes
         p = p.lstrip("/")
 
-        # If we can find the 'Districts' segment, keep from there
+        # Remove FTProot prefix if present (case insensitive)
         lower_p = p.lower()
-        idx = lower_p.find("districts/")
-        if idx != -1:
-            p = p[idx:]
-        else:
-            # Fallback: also handle paths that start with 'ftproot/districts/...'
-            idx2 = lower_p.find("ftproot/districts/")
-            if idx2 != -1:
-                p = p[idx2 + len("ftproot/"):]
+        ftproot_idx = lower_p.find("ftproot/")
+        if ftproot_idx != -1:
+            # Remove everything up to and including "ftproot/"
+            p = p[ftproot_idx + len("ftproot/"):]
 
         # Collapse any duplicate slashes
         while "//" in p:
@@ -180,7 +177,8 @@ class FileManager:
             if f.startswith(str(request_id)):
                 try:
                     # Check if it's a directory
-                    if sftp.stat(f"{remote_dir}/{f}").st_mode & 0o40000:
+                    stat_result = sftp.stat(f"{remote_dir}/{f}")
+                    if stat_result and stat_result.st_mode is not None and (stat_result.st_mode & 0o40000):
                         match_dir = f
                         break
                 except Exception:
