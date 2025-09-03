@@ -97,6 +97,7 @@ class DatabaseManager:
         type_name_prefixes: Optional[List[str]] = None,
         district_ids: Optional[List[int]] = None,
         statuses: Sequence[int] = (4, 5),
+        since_date: Optional[datetime] = None,
     ) -> List[RequestRow]:
         """
         Find latest requests by various criteria.
@@ -107,6 +108,7 @@ class DatabaseManager:
             type_name_prefixes: Optional list of type name prefixes
             district_ids: Optional list of DistrictIDs
             statuses: Request statuses to include (default: 4=failed, 5=success)
+            since_date: Optional datetime to filter requests since this date
             
         Returns:
             List of RequestRow objects
@@ -165,7 +167,10 @@ class DatabaseManager:
         if district_ids:
             query = query.filter(Request.DistrictID.in_(district_ids))
 
-        rows = query.order_by(Request.DistrictID, Request.DataRequestTypeID).all()
+        if since_date:
+            query = query.filter(Request.RequestTime >= since_date)
+
+        rows = query.order_by(Request.RequestTime.desc()).all()
         return [
             RequestRow(
                 RequestID=r.RequestID,

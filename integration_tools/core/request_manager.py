@@ -9,6 +9,7 @@ import os
 import tempfile
 import time
 import webbrowser
+from datetime import datetime
 from typing import Dict, List, Optional, Sequence
 
 from .credential_manager import CredentialManager
@@ -117,6 +118,7 @@ class RequestManager:
         type_names: Optional[List[str]] = None,
         district_ids: Optional[List[int]] = None,
         statuses: Sequence[int] = (4, 5),
+        since_date: Optional[datetime] = None,
     ) -> List[RequestRow]:
         """
         Find latest requests by various criteria.
@@ -126,6 +128,7 @@ class RequestManager:
             type_names: Optional list of type name prefixes
             district_ids: Optional list of DistrictIDs
             statuses: Request statuses to include (default: 4=failed, 5=success)
+            since_date: Optional datetime to filter requests since this date
             
         Returns:
             List of RequestRow objects
@@ -133,7 +136,7 @@ class RequestManager:
         username, password = self.get_db_credentials()
         with self.db_manager.get_session(username, password) as session:
             return self.db_manager.find_latest_requests(
-                session, type_ids, type_names, district_ids, statuses
+                session, type_ids, type_names, district_ids, statuses, since_date
             )
     
     def show_email_content(self, request_id: int, cleanup_expired: bool = True) -> bool:

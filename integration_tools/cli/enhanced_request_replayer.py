@@ -5,6 +5,7 @@ Enhanced Request Replayer CLI with rich interface and batch operations.
 import asyncio
 import json
 import os
+from datetime import datetime
 from typing import List, Optional
 
 import click
@@ -78,10 +79,11 @@ def list_types(ctx, name_filter):
 @click.option('--type-ids', help='Comma-separated DataRequestTypeIDs')
 @click.option('--type-names', help='Comma-separated type name prefixes')
 @click.option('--district-ids', help='Comma-separated DistrictIDs')
+@click.option('--since-date', help='Filter requests since this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)')
 @click.option('--json-output', is_flag=True, help='Output as JSON')
 @click.option('--save-csv', help='Save results to CSV file')
 @click.pass_context
-def find_requests(ctx, type_ids, type_names, district_ids, json_output, save_csv):
+def find_requests(ctx, type_ids, type_names, district_ids, since_date, json_output, save_csv):
     """Find latest requests by various criteria."""
     try:
         rm = get_request_manager(ctx)
@@ -91,12 +93,26 @@ def find_requests(ctx, type_ids, type_names, district_ids, json_output, save_csv
         type_name_list = [x.strip() for x in type_names.split(',')] if type_names else None
         district_id_list = [int(x.strip()) for x in district_ids.split(',')] if district_ids else None
         
+        # Parse since_date parameter
+        since_date_obj = None
+        if since_date:
+            try:
+                # Try parsing with time first (YYYY-MM-DD HH:MM:SS)
+                since_date_obj = datetime.strptime(since_date, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    # Try parsing date only (YYYY-MM-DD)
+                    since_date_obj = datetime.strptime(since_date, "%Y-%m-%d")
+                except ValueError:
+                    rprint(f"[red]Error: Invalid date format '{since_date}'. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS[/red]")
+                    return
+        
         # Get credentials BEFORE starting the status display to avoid blocking prompts
         # This ensures any credential prompts happen before the Rich status interferes
         rm.get_db_credentials()
         
         with console.status("[bold green]Searching for requests..."):
-            requests = rm.find_requests(type_id_list, type_name_list, district_id_list)
+            requests = rm.find_requests(type_id_list, type_name_list, district_id_list, since_date=since_date_obj)
         
         if not requests:
             rprint("[yellow]No matching requests found.[/yellow]")
