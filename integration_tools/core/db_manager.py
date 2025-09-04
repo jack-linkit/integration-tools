@@ -7,11 +7,37 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence, Tuple
+import pytz
 
 from sqlalchemy import create_engine, func, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from integration_tools.models import DataRequestType, Request, RequestEmailNotification, XpsDistrictUpload
+
+
+def convert_utc_to_est(utc_dt: Optional[datetime]) -> Optional[datetime]:
+    """
+    Convert UTC datetime to Eastern Time (EST/EDT).
+    
+    Args:
+        utc_dt: UTC datetime to convert
+        
+    Returns:
+        Datetime converted to Eastern timezone or None if input is None
+    """
+    if utc_dt is None:
+        return None
+    
+    # Ensure the datetime is timezone-aware (assume UTC if naive)
+    if utc_dt.tzinfo is None:
+        utc_dt = pytz.UTC.localize(utc_dt)
+    elif utc_dt.tzinfo != pytz.UTC:
+        # Convert to UTC first if it's in a different timezone
+        utc_dt = utc_dt.astimezone(pytz.UTC)
+    
+    # Convert to Eastern timezone (handles EST/EDT automatically)
+    eastern = pytz.timezone('US/Eastern')
+    return utc_dt.astimezone(eastern)
 
 
 @dataclass
@@ -24,6 +50,7 @@ class RequestRow:
     ImportedFileName: Optional[str]
     Status: Optional[int]
     RequestTime: Optional[datetime]
+    RequestTimeEST: Optional[datetime] = None
 
 
 class DatabaseManager:
@@ -180,6 +207,7 @@ class DatabaseManager:
                 ImportedFileName=r.ImportedFileName,
                 Status=r.Status,
                 RequestTime=r.RequestTime,
+                RequestTimeEST=convert_utc_to_est(r.RequestTime),
             )
             for r in rows
         ]

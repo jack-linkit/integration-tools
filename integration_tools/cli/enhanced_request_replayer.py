@@ -127,7 +127,8 @@ def find_requests(ctx, type_ids, type_names, district_ids, since_date, json_outp
                     "DataRequestTypeID": r.DataRequestTypeID,
                     "ImportedFileName": r.ImportedFileName,
                     "Status": r.Status,
-                    "RequestTime": r.RequestTime.isoformat() if r.RequestTime else None
+                    "RequestTime": r.RequestTime.isoformat() if r.RequestTime else None,
+                    "RequestTimeEST": r.RequestTimeEST.isoformat() if hasattr(r, 'RequestTimeEST') and r.RequestTimeEST else None
                 }
                 for r in requests
             ]
@@ -139,17 +140,19 @@ def find_requests(ctx, type_ids, type_names, district_ids, since_date, json_outp
             table.add_column("Type Name", width=20)
             table.add_column("Type ID", width=8)
             table.add_column("Status", width=8)
-            table.add_column("Request Time", width=18)
+            table.add_column("Request Time (EST)", width=22)
             
             for r in requests:
                 status_color = "green" if r.Status == 5 else "red" if r.Status == 4 else "yellow"
+                # Use EST time if available, fallback to UTC time
+                display_time = r.RequestTimeEST if hasattr(r, 'RequestTimeEST') and r.RequestTimeEST else r.RequestTime
                 table.add_row(
                     str(r.RequestID),
                     str(r.DistrictID),
                     r.DataRequestTypeName or "",
                     str(r.DataRequestTypeID),
                     f"[{status_color}]{r.Status}[/{status_color}]",
-                    r.RequestTime.strftime("%Y-%m-%d %H:%M:%S") if r.RequestTime else ""
+                    display_time.strftime("%Y-%m-%d %H:%M:%S") if display_time else ""
                 )
             
             console.print(table)
@@ -159,12 +162,14 @@ def find_requests(ctx, type_ids, type_names, district_ids, since_date, json_outp
             import csv
             with open(save_csv, 'w', newline='') as csvfile:
                 writer = csv.writer(csvfile)
-                writer.writerow(['RequestID', 'DistrictID', 'TypeName', 'TypeID', 'Status', 'RequestTime'])
+                writer.writerow(['RequestID', 'DistrictID', 'TypeName', 'TypeID', 'Status', 'RequestTime_UTC', 'RequestTime_EST'])
                 for r in requests:
+                    display_time_est = r.RequestTimeEST if hasattr(r, 'RequestTimeEST') and r.RequestTimeEST else r.RequestTime
                     writer.writerow([
                         r.RequestID, r.DistrictID, r.DataRequestTypeName, 
                         r.DataRequestTypeID, r.Status,
-                        r.RequestTime.strftime("%Y-%m-%d %H:%M:%S") if r.RequestTime else ""
+                        r.RequestTime.strftime("%Y-%m-%d %H:%M:%S") if r.RequestTime else "",
+                        display_time_est.strftime("%Y-%m-%d %H:%M:%S") if display_time_est else ""
                     ])
             rprint(f"[green]Results saved to {save_csv}[/green]")
         

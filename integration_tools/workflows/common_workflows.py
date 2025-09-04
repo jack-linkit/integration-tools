@@ -291,7 +291,8 @@ class CommonWorkflows:
                         "RequestID": request.RequestID,
                         "DistrictID": request.DistrictID,
                         "TypeName": request.DataRequestTypeName,
-                        "RequestTime": request.RequestTime.isoformat() if request.RequestTime else None
+                        "RequestTime": request.RequestTime.isoformat() if request.RequestTime else None,
+                        "RequestTimeEST": request.RequestTimeEST.isoformat() if hasattr(request, 'RequestTimeEST') and request.RequestTimeEST else None
                     })
                     analysis["districts_with_failures"].add(request.DistrictID)
                 
