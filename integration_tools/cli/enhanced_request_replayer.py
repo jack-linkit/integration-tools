@@ -203,7 +203,7 @@ def show_email(ctx, request_id):
 @cli.command()
 @click.argument('request_ids')
 @click.option('--local-dir', default='~/Downloads', help='Local download directory')
-@click.option('--max-concurrent', default=5, help='Maximum concurrent downloads')
+@click.option('--max-concurrent', default=1, help='Maximum concurrent downloads')
 @click.pass_context
 def download(ctx, request_ids, local_dir, max_concurrent):
     """Download files for requests (comma-separated IDs)."""
@@ -244,7 +244,7 @@ def download(ctx, request_ids, local_dir, max_concurrent):
 @cli.command()
 @click.argument('request_ids')
 @click.option('--temp-dir', default='/tmp', help='Temporary directory for processing')
-@click.option('--max-concurrent', default=3, help='Maximum concurrent restores')
+@click.option('--max-concurrent', default=1, help='Maximum concurrent restores')
 @click.pass_context
 def restore(ctx, request_ids, temp_dir, max_concurrent):
     """Restore processed files for requests back to SFTP."""
@@ -373,7 +373,7 @@ def district_refresh(ctx, district_ids, type_names, delete_checksums, restore_fi
 @click.argument('type_names')
 @click.option('--district-ids', help='Optional district filter (comma-separated)')
 @click.option('--local-dir', default='~/Downloads/bulk_download', help='Local download directory')
-@click.option('--max-concurrent', default=5, help='Maximum concurrent downloads')
+@click.option('--max-concurrent', default=1, help='Maximum concurrent downloads')
 @click.pass_context
 def bulk_download(ctx, type_names, district_ids, local_dir, max_concurrent):
     """Bulk download files for request types."""
