@@ -84,7 +84,3 @@ mypy src/
 2. Make your changes with tests
 3. Ensure all tests pass and code is formatted
 4. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
