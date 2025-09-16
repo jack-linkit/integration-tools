@@ -156,21 +156,26 @@ class DatabaseManager:
             effective_type_ids.extend([int(r[0]) for r in trows])
 
         effective_type_ids = sorted(set(effective_type_ids))
-        if not effective_type_ids:
-            return []
 
         # Get latest request per (DistrictID, DataRequestTypeID)
-        latest = (
+        latest_query = (
             session.query(
                 Request.DistrictID,
                 Request.DataRequestTypeID,
                 func.max(Request.RequestID).label("MaxRequestID"),
             )
             .filter(Request.Status.in_(list(statuses)))
-            .filter(Request.DataRequestTypeID.in_(effective_type_ids))
             .group_by(Request.DistrictID, Request.DataRequestTypeID)
-            .subquery()
         )
+        
+        # Apply filters early for better performance
+        if district_ids:
+            latest_query = latest_query.filter(Request.DistrictID.in_(district_ids))
+            
+        if effective_type_ids:
+            latest_query = latest_query.filter(Request.DataRequestTypeID.in_(effective_type_ids))
+            
+        latest = latest_query.subquery()
 
         query = (
             session.query(
@@ -190,9 +195,6 @@ class DatabaseManager:
             )
             .join(DataRequestType, DataRequestType.DataRequestTypeID == Request.DataRequestTypeID)
         )
-
-        if district_ids:
-            query = query.filter(Request.DistrictID.in_(district_ids))
 
         if since_date:
             query = query.filter(Request.RequestTime >= since_date)
